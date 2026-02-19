@@ -1,17 +1,17 @@
 import React, { useEffect } from 'react';
-import { View, TouchableOpacity, StyleSheet, LayoutChangeEvent, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// Updated for 4 Tabs. 20px padding * 2 = 40px total margin.
-const TAB_WIDTH = (SCREEN_WIDTH - 40) / 4; 
-
 export const FluidTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, navigation }) => {
+  const { width: SCREEN_WIDTH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const translateX = useSharedValue(0);
+
+  // Updated for 4 Tabs. 20px padding * 2 = 40px total margin.
+  const TAB_WIDTH = (SCREEN_WIDTH - 40) / 4; 
 
   // Update position when tab changes
   useEffect(() => {
@@ -20,16 +20,17 @@ export const FluidTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
         stiffness: 150,
         mass: 0.5
     });
-  }, [state.index]);
+  }, [state.index, TAB_WIDTH]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [{ translateX: translateX.value }],
+      width: TAB_WIDTH, // Ensure the indicator width updates dynamically
     };
   });
 
   return (
-    <View style={[styles.container, { bottom: insets.bottom + 4 }]}>
+    <View style={[styles.container, { bottom: insets.bottom + 4, width: SCREEN_WIDTH - 40 }]}>
         {/* Background Blur or Dark Layer */}
         <View style={StyleSheet.absoluteFill} className="bg-neutral-900/95 rounded-[35px] border border-white/10" />
 
@@ -73,7 +74,7 @@ export const FluidTabBar: React.FC<BottomTabBarProps> = ({ state, descriptors, n
                     <TouchableOpacity
                         key={index}
                         onPress={onPress}
-                        style={styles.tabButton}
+                        style={[styles.tabButton, { width: TAB_WIDTH }]}
                         activeOpacity={0.8}
                     >
                         <View className="items-center justify-center">
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     left: 20,
-    right: 20,
+    // right: 20, // Removed right: 20 to rely on explicit width
     height: 70, // Height is good for visible touch target
     borderRadius: 35,
     overflow: 'hidden',
@@ -125,13 +126,14 @@ const styles = StyleSheet.create({
   },
   indicator: {
     position: 'absolute',
-    width: TAB_WIDTH,
+    // width: TAB_WIDTH, // Width is now controlled by animatedStyle
     height: '100%',
     padding: 6, // Reduced padding to make pill fill more space
     justifyContent: 'center',
   },
   tabButton: {
-    flex: 1,
+    // flex: 1, // Removed flex: 1 to rely on explicit width
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
   },

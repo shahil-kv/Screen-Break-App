@@ -1,12 +1,9 @@
-import { View, Text, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, useWindowDimensions, ScrollView } from 'react-native';
 import { Svg, Rect, Line, Text as SvgText, G } from 'react-native-svg';
 import { MOCK_DATA, HourlyUsage } from '../utils/screenTimeData';
 
-const { width } = Dimensions.get('window');
 const CHART_HEIGHT = 200;
-// Make chart wider than screen to enable scrolling. 
-// 24 hours * ~40px per bar = 960px. Let's maximize visibility.
-const CHART_WIDTH = Math.max(width * 2, 800); 
 const MAX_BAR_HEIGHT = 150;
 
 interface Props {
@@ -17,22 +14,33 @@ interface Props {
 }
 
 export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, selectedAppId, onSelectHour }) => {
+    const { width } = useWindowDimensions();
+    // Make chart wider than screen to enable scrolling. 
+    // 24 hours * ~40px per bar = 960px. Let's maximize visibility.
+    const CHART_WIDTH = Math.max(width * 2, 800); 
+
     const data = MOCK_DATA[selectedDate];
     
-    if (!data) return <Text className="text-white">No Data</Text>;
+    // Memoize the calculation of hourly values and max duration to prevent re-calc on every render
+    const chartData = useMemo(() => {
+        if (!data) return null;
 
-    // Calculate max value for scaling
-    // If app selected: Max is the max duration of that app across all hours
-    // If no app selected: Max is the max total duration of any hour
-    const hourlyValues = data.hourly.map(h => {
-        if (selectedAppId) {
-            const app = h.apps.find(a => a.id === selectedAppId);
-            return app ? app.duration : 0;
-        }
-        return h.totalDuration;
-    });
+        const hourlyValues = data.hourly.map(h => {
+            if (selectedAppId) {
+                const app = h.apps.find(a => a.id === selectedAppId);
+                return app ? app.duration : 0;
+            }
+            return h.totalDuration;
+        });
 
-    const maxDuration = Math.max(...hourlyValues, 60); // Minimum 1 min scale
+        const maxDuration = Math.max(...hourlyValues, 60); // Minimum 1 min scale
+
+        return { hourlyValues, maxDuration };
+    }, [data, selectedAppId]);
+
+    if (!data || !chartData) return <Text className="text-white">No Data</Text>;
+
+    const { hourlyValues, maxDuration } = chartData;
 
     return (
         <View className="items-center justify-center py-4 bg-transparent">
@@ -120,12 +128,6 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
                             );
                         })}
                     </Svg>
-
-                    {/* Tooltip / Info - Positioned relative to scroll view might be tricky. 
-                        Let's keep it fixed at top of chart? Or let the parent handle it. 
-                        Actually, parent handles the "Filter Chip". 
-                        We can remove local tooltip to avoid scrolling issues.
-                    */}
                 </View>
             </ScrollView>
         </View>
