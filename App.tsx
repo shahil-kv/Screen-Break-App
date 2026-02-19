@@ -1,11 +1,22 @@
 import 'react-native-gesture-handler';
-import 'react-native-reanimated';
-import React from 'react';
+import { configureReanimatedLogger, ReanimatedLogLevel } from 'react-native-reanimated';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { LogBox, View } from 'react-native';
+import { LogBox, View, ActivityIndicator } from 'react-native';
+
+// Configure Reanimated Logger to disable strict mode warnings
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false, 
+});
+
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts, Outfit_400Regular, Outfit_700Bold } from '@expo-google-fonts/outfit';
+
 import { Ionicons } from '@expo/vector-icons';
 import { BlockingProvider } from './context/BlockingContext';
 import { BreakOverlay } from './components/blocking/BreakOverlay';
@@ -13,6 +24,7 @@ import { HomeScreen } from './components/screens/HomeScreen';
 import { BlocksScreen } from './components/screens/BlocksScreen';
 import { ExtensionsScreen } from './components/screens/ExtensionsScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
+import { OnboardingScreen } from './components/screens/OnboardingScreen';
 import { FluidTabBar } from './components/navigation/FluidTabBar';
 import './global.css';
 
@@ -20,8 +32,7 @@ import './global.css';
 LogBox.ignoreLogs([/SafeAreaView has been deprecated/]);
 
 const Tab = createBottomTabNavigator();
-
-// ...
+const Stack = createStackNavigator();
 
 function TabNavigator() {
   return (
@@ -42,14 +53,58 @@ function TabNavigator() {
 }
 
 export default function App() {
+  const [isFirstLaunch, setIsFirstLaunch] = useState<boolean | null>(null);
+  const [fontsLoaded] = useFonts({
+    Outfit_400Regular,
+    Outfit_700Bold,
+  });
+
+  useEffect(() => {
+    async function checkFirstLaunch() {
+      try {
+        // FOR DEV: Clear storage to test onboarding
+        // await AsyncStorage.removeItem('hasLaunched');
+        
+        const value = await AsyncStorage.getItem('hasLaunched');
+        
+        // FOR DEV: Force onboarding every time
+        setIsFirstLaunch(true);
+        return;
+
+        if (value === null) {
+          setIsFirstLaunch(true);
+        } else {
+          setIsFirstLaunch(false);
+        }
+      } catch (error) {
+         console.error('Error checking first launch:', error);
+         setIsFirstLaunch(false); // Default to main if error
+      }
+    }
+    checkFirstLaunch();
+  }, []);
+
+  if (!fontsLoaded || isFirstLaunch === null) {
+      return (
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+              <ActivityIndicator size="large" color="#ec4899" />
+          </View>
+      );
+  }
+
   return (
     <SafeAreaProvider>
       <BlockingProvider>
         <NavigationContainer>
-           <TabNavigator />
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+                {isFirstLaunch && (
+                    <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                )}
+                <Stack.Screen name="Main" component={TabNavigator} />
+            </Stack.Navigator>
            <BreakOverlay />
         </NavigationContainer>
-        <StatusBar style="light" />
+        <StatusBar style="auto" /> 
       </BlockingProvider>
     </SafeAreaProvider>
   );

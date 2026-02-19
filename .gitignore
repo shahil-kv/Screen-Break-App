@@ -13,11 +13,12 @@ web-build/
 
 
 
-ios
-android
+/ios
+/android
 
 # macOS
 .DS_Store
 
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
+modules/screen-time/android/build/.transforms/5ea1d88709fa9a196d75d0f7d9945e0f/transformed/bundleLibRuntimeToDirDebug/bundleLibRuntimeToDirDebug_dex/com/shahil/screentime/ScreenTimeModule$definition$lambda$4$$inlined$AsyncFunctionWithoutArgs$1.dex

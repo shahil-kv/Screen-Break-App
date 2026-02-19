@@ -1,0 +1,5 @@
+# Ignore build artifacts for this module
+build/
+.cxx/
+.gradle/
+local.properties
