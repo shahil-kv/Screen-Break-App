@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, useWindowDimensions, ScrollView } from 'react-native';
 import { Svg, Rect, Line, Text as SvgText, G } from 'react-native-svg';
-import { MOCK_DATA, HourlyUsage } from '../utils/screenTimeData';
+import { HourlyUsage, DailyUsage } from '../utils/screenTimeData';
 
 const CHART_HEIGHT = 200;
 const MAX_BAR_HEIGHT = 150;
@@ -11,15 +11,16 @@ interface Props {
     selectedHour: number | null;
     selectedAppId: string | null;
     onSelectHour: (hour: number | null) => void;
+    dailyData?: DailyUsage; // Added prop
 }
 
-export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, selectedAppId, onSelectHour }) => {
+export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, selectedAppId, onSelectHour, dailyData }) => {
     const { width } = useWindowDimensions();
     // Make chart wider than screen to enable scrolling. 
     // 24 hours * ~40px per bar = 960px. Let's maximize visibility.
     const CHART_WIDTH = Math.max(width * 2, 800); 
 
-    const data = MOCK_DATA[selectedDate];
+    const data = dailyData;
     
     // Memoize the calculation of hourly values and max duration to prevent re-calc on every render
     const chartData = useMemo(() => {
@@ -85,12 +86,16 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
                             } else {
                                 // Intensity Coloring
                                 const minutes = value / 60;
-                                if (minutes < 15) barColor = "#4ade80"; // Green (Low)
-                                else if (minutes < 40) barColor = "#facc15"; // Yellow (Medium)
+                                if (minutes === 0) barColor = "#27272a"; // Zinc 800 for Empty
+                                else if (minutes < 20) barColor = "#4ade80"; // Green (Low)
+                                else if (minutes < 45) barColor = "#facc15"; // Yellow (Medium)
                                 else barColor = "#f87171"; // Red (High)
                             }
 
                             if (isSelected) barColor = "#ffffff"; // Selected Hour is always White
+
+                            const finalBarColor = barColor;
+                            const barOpacity = selectedHour !== null && !isSelected ? 0.3 : 1;
 
                             return (
                                 <G key={index} onPress={() => onSelectHour(isSelected ? null : item.hour)}>
@@ -109,8 +114,9 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
                                         y={y}
                                         width={barWidth}
                                         height={barHeight}
-                                        fill={barColor}
+                                        fill={finalBarColor}
                                         rx={4}
+                                        opacity={barOpacity}
                                     />
                                     {/* Label for specific hours. Now we show more labels since it scrolls. */}
                                     {index % 4 === 0 && (
@@ -118,7 +124,7 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
                                             x={x + barWidth / 2 + 4}
                                             y={MAX_BAR_HEIGHT + 20}
                                             fontSize="12"
-                                            fill="gray"
+                                            fill={isSelected ? "white" : "gray"} // Change label color on selection
                                             textAnchor="middle"
                                         >
                                             {index === 0 ? '12AM' : index === 12 ? '12PM' : index > 12 ? `${index-12}PM` : `${index}AM`}

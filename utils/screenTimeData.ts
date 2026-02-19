@@ -5,6 +5,8 @@ export interface AppUsage {
     duration: number; // in seconds
     category: string;
     color: string;
+    pickups?: number;
+    notifications?: number;
 }
 
 export interface HourlyUsage {
@@ -18,6 +20,7 @@ export interface DailyUsage {
     totalDuration: number;
     hourly: HourlyUsage[];
     apps?: AppUsage[]; // Aggregated apps for the day
+    pickups?: number; // Total unlocks/pickups
 }
 
 const APPS = [

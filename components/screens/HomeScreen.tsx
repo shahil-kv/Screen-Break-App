@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, AppState } from 'react-native';
 import { useBlocking } from '../../context/BlockingContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,12 +7,12 @@ import { ScreenTimeChart } from '../ScreenTimeChart';
 import { ScreenTimeService } from '../../services/ScreenTimeService';
 import { DailyUsage, AppUsage, MOCK_DATA } from '../../utils/screenTimeData';
 import { DatePickerModal } from '../ui/DatePickerModal';
+import { PermissionBanner } from '../ui/PermissionBanner';
 
 // Optimized Sub-components
 import { DateStrip } from '../home/DateStrip';
 import { DailyOverview } from '../home/DailyOverview';
 import { AppUsageList } from '../home/AppUsageList';
-import { Platform, AppState } from 'react-native';
 
 export const HomeScreen = () => {
   const { isStrict, setStrict, triggerDemoBlock } = useBlocking();
@@ -46,22 +46,26 @@ export const HomeScreen = () => {
   }, [selectedDate]);
 
   const checkPermissionAndLoadData = async () => {
+    console.log('[HomeScreen] Checking permissions...');
     if (Platform.OS === 'android') {
-        const hasPerm = await ScreenTimeService.hasPermission();
-        setHasPermission(hasPerm);
-        
-        if (hasPerm) {
-            // Load for selected date
-            // Note: Our selectedDate is just a number (day of month), logic needs to map it to timestamp
-            // For MVP, we assume current month/year.
-            const date = new Date();
-            date.setDate(selectedDate);
-            const data = await ScreenTimeService.getDailyUsage(date.getTime());
-            setDailyData(data);
-        } else {
-             // Fallback to MOCK if no permission (or show empty)
-             // We will show a permission prompt banner instead locally
-             setDailyData(MOCK_DATA[selectedDate] ?? null);
+        try {
+            const hasPerm = await ScreenTimeService.hasPermission();
+            console.log('[HomeScreen] hasPermission result:', hasPerm);
+            setHasPermission(hasPerm);
+            
+            if (hasPerm) {
+                console.log('[HomeScreen] Fetching daily usage...');
+                const date = new Date();
+                date.setDate(selectedDate);
+                const data = await ScreenTimeService.getDailyUsage(date.getTime());
+                console.log('[HomeScreen] Daily usage fetched:', data ? 'Data found' : 'Null');
+                setDailyData(data);
+            } else {
+                 console.log('[HomeScreen] Permission denied. Loading mock data.');
+                 setDailyData(MOCK_DATA[selectedDate] ?? null);
+            }
+        } catch (error) {
+            console.error('[HomeScreen] Error checking permission:', error);
         }
     } else {
         // iOS / Other: Use MOCK
@@ -161,14 +165,16 @@ export const HomeScreen = () => {
         <View className="px-5 pt-2 pb-4 flex-row justify-between items-center bg-black z-10">
             <Text className="text-white text-xl font-bold">Screen Save</Text>
             <View className="flex-row">
-                <TouchableOpacity onPress={handleToggleStrict} className="mr-4">
-                     <Ionicons name={isStrict ? "shield-checkmark" : "shield-outline"} size={22} color={isStrict ? "#ec4899" : "gray"} />
-                </TouchableOpacity>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={checkPermissionAndLoadData}>
                     <Ionicons name="refresh" size={20} color="white" />
                 </TouchableOpacity>
             </View>
         </View>
+
+        {/* Permission Banner */}
+        {!hasPermission && Platform.OS === 'android' && (
+            <PermissionBanner onPress={handleRequestPermission} />
+        )}
 
         {/* Date Strip */}
         <DateStrip 
@@ -182,7 +188,7 @@ export const HomeScreen = () => {
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
             {/* Daily Overview Card */}
             <DailyOverview 
-                dailyData={dailyData}
+                dailyData={dailyData ?? undefined}
                 selectedAppId={selectedAppId}
                 selectedAppDuration={selectedAppDuration}
                 onClearAppSelection={handleClearAppSelection}
@@ -196,7 +202,8 @@ export const HomeScreen = () => {
                     selectedDate={selectedDate} 
                     selectedHour={selectedHour} 
                     selectedAppId={selectedAppId}
-                    onSelectHour={setSelectedHour} 
+                    onSelectHour={setSelectedHour}
+                    dailyData={dailyData ?? undefined}
                 />
 
                 {/* Filter Chip */}
@@ -213,10 +220,15 @@ export const HomeScreen = () => {
                     </View>
                 )}
 
-                {/* Separator if needed, or just space */}
+                {/* Separator */}
                 <View className="h-[1px] bg-zinc-800 my-4" />
 
                 {/* App List (Nested Inside) */}
+                <Text className="text-white text-lg font-bold mb-4">
+                    {selectedHour !== null 
+                        ? `Apps used at ${selectedHour}:00` 
+                        : "Most Used Apps"}
+                </Text>
                 <AppUsageList 
                     apps={displayedApps}
                     selectedAppId={selectedAppId}
