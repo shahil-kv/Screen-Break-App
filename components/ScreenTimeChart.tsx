@@ -26,13 +26,13 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
     const chartData = useMemo(() => {
         if (!data) return null;
 
-        // FILTER: Only keep hours with usage > 0
+        // FILTER: Only keep hours with usage >= 5 minutes (300 seconds)
         const activeHours = data.hourly.filter(h => {
-             // If specific app selected, check if THAT app was used
+             // If specific app selected, check if THAT app was used > 5 mins
              if (selectedAppId) {
-                 return h.apps.some(a => a.id === selectedAppId && a.duration > 0);
+                 return h.apps.some(a => a.id === selectedAppId && a.duration >= 300);
              }
-             return h.totalDuration > 0; // Otherwise check total
+             return h.totalDuration >= 300; // Otherwise check total >= 5 mins
         });
 
         // Map to display values
@@ -49,7 +49,7 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
                  const minutes = value / 60;
                  if (minutes < 20) color = "#4ade80"; 
                  else if (minutes < 45) color = "#facc15"; 
-                 else color = "#f87171"; 
+                 else color = "#ef4444";  // Red-500 
              }
              
              return {
@@ -74,106 +74,101 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
     const { displayItems, maxDuration } = chartData;
     const itemCount = displayItems.length;
     
-    // Dynamic Width Calculation
-    // Ensure at least 40px per bar + gaps
-    const minBarWidth = 40; 
-    const minGap = 10;
-    const minSlotWidth = minBarWidth + minGap;
-    const contentWidth = Math.max(width - 40, itemCount * minSlotWidth);
+    // Dynamic Width Calculation (Fit to Screen)
+    const totalAvailableWidth = width - 40; // Screen width minus padding
+    const barSlotWidth = totalAvailableWidth / Math.max(itemCount, 3); // Divide by item count (min 3 to prevent single huge bar)
     
+    // Bar width logic: 
+    // - Try to fill 65% of the slot
+    // - But cap it at 60px max (so 2 bars don't look like walls)
+    // - And ensure min width of 4px for visibility if super crowded
+    let barWidth = Math.min(barSlotWidth * 0.65, 60); 
+    barWidth = Math.max(barWidth, 4); 
+
+    const gap = (barSlotWidth - barWidth) / 2;
+
     return (
         <View className="w-full h-[220px] items-center justify-center bg-transparent relative">
-             <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ width: contentWidth, height: '100%' }}
-                style={{ width: width - 40 }}
-             >
-                <View className="flex-1 w-full h-full relative">
-                    {/* Grid Lines (Background - Fixed to content width) */}
-                    <Svg width={contentWidth} height={MAX_BAR_HEIGHT} style={{ position: 'absolute', top: 20 }}>
-                        {[0, 0.5, 1].map((ratio) => (
-                            <Line
-                                key={ratio}
-                                x1="0"
-                                y1={MAX_BAR_HEIGHT * ratio}
-                                x2={contentWidth}
-                                y2={MAX_BAR_HEIGHT * ratio}
-                                stroke="#3f3f46" // Zinc 700
-                                strokeDasharray="4 4"
-                                strokeOpacity="0.5"
-                            />
-                        ))}
-                    </Svg>
-        
-                    {/* Visual Bars (SVG) */}
-                    <Svg width={contentWidth} height={CHART_HEIGHT}>
-                        {displayItems.map((item, index) => {
-                            const barHeight = (item.value / maxDuration) * MAX_BAR_HEIGHT;
-                            
-                            // Slot width distributes space evenly if contentWidth > min needed
-                            const barSlotWidth = contentWidth / itemCount;
-                            const barWidth = Math.min(barSlotWidth * 0.7, 50); // Cap width at 50
-                            const gap = (barSlotWidth - barWidth) / 2;
-                            
-                            const x = index * barSlotWidth + gap;
-                            const y = MAX_BAR_HEIGHT - barHeight + 20; // +20 offset for top padding
-                            
-                            const isSelected = selectedHour === item.hour;
-                            
-                            // Formatter for label (e.g. 9AM)
-                            const labelText = item.hour === 0 ? '12A' : item.hour === 12 ? '12P' : item.hour > 12 ? `${item.hour-12}P` : `${item.hour}A`;
+             <View style={{ width: totalAvailableWidth, height: '100%', position: 'relative' }}>
+                {/* Grid Lines (Background) */}
+                <Svg width={totalAvailableWidth} height={MAX_BAR_HEIGHT} style={{ position: 'absolute', top: 20 }}>
+                    {[0, 0.5, 1].map((ratio) => (
+                        <Line
+                            key={ratio}
+                            x1="0"
+                            y1={MAX_BAR_HEIGHT * ratio}
+                            x2={totalAvailableWidth}
+                            y2={MAX_BAR_HEIGHT * ratio}
+                            stroke="#3f3f46" // Zinc 700
+                            strokeDasharray="4 4"
+                            strokeOpacity="0.5"
+                        />
+                    ))}
+                </Svg>
     
-                            // Selection Style: Keep color, add stroke/shadow effect
-                            const opacity = selectedHour !== null && !isSelected ? 0.3 : 1;
-                            const stroke = isSelected ? "white" : "none";
-                            const strokeWidth = isSelected ? 2 : 0;
-    
-                            return (
-                                <G key={item.hour}>
-                                    <Rect
-                                        x={x}
-                                        y={y}
-                                        width={barWidth}
-                                        height={barHeight}
-                                        fill={item.color}
-                                        rx={6} // More rounded
-                                        opacity={opacity}
-                                        stroke={stroke}
-                                        strokeWidth={strokeWidth}
-                                    />
-                                    {/* Label */}
+                {/* Visual Bars (SVG) */}
+                <Svg width={totalAvailableWidth} height={CHART_HEIGHT}>
+                    {displayItems.map((item, index) => {
+                        const barHeight = (item.value / maxDuration) * MAX_BAR_HEIGHT;
+                        const x = index * barSlotWidth + gap;
+                        const y = MAX_BAR_HEIGHT - barHeight + 20; // +20 offset for top padding
+                        
+                        // Formatter: Smart labels. 
+                        // If bars are too thin (<25px), show fewer labels to avoid overlapping
+                        const isSelected = selectedHour === item.hour;
+                        const showLabel = barSlotWidth > 25 || index % 2 === 0 || isSelected;
+                        const labelText = item.hour === 0 ? '12A' : item.hour === 12 ? '12P' : item.hour > 12 ? `${item.hour-12}P` : `${item.hour}A`;
+
+                        // Opacity: If something is selected, fade others.
+                        const opacity = selectedHour !== null && !isSelected ? 0.3 : 1;
+                        const stroke = isSelected ? "white" : "none";
+                        const strokeWidth = isSelected ? 2 : 0;
+                        
+                        // Fix Red Color: Use stronger Red
+                        const finalColor = item.color === "#f87171" ? "#ef4444" : item.color;
+
+                        return (
+                            <G key={item.hour}>
+                                <Rect
+                                    x={x}
+                                    y={y}
+                                    width={barWidth}
+                                    height={barHeight}
+                                    fill={finalColor}
+                                    rx={barWidth > 10 ? 6 : 2} // Round less if thin
+                                    opacity={opacity}
+                                    stroke={stroke}
+                                    strokeWidth={strokeWidth}
+                                />
+                                {showLabel && (
                                     <SvgText
                                         x={index * barSlotWidth + (barSlotWidth / 2)}
                                         y={MAX_BAR_HEIGHT + 40} // Below bars
-                                        fontSize="10"
+                                        fontSize={Math.min(10, barSlotWidth * 0.4)} // Scale font if needed
                                         fill={isSelected ? "white" : "gray"}
                                         fontWeight={isSelected ? "bold" : "normal"}
                                         textAnchor="middle"
                                     >
                                         {labelText}
                                     </SvgText>
-                                </G>
-                            );
-                        })}
-                    </Svg>
+                                )}
+                            </G>
+                        );
+                    })}
+                </Svg>
 
-                    {/* Touch Overlay - Robust Touch Handling */}
-                    <View style={{ position: 'absolute', top: 0, left: 0, width: contentWidth, height: '100%', flexDirection: 'row' }}>
-                         {displayItems.map((item) => {
-                             const barSlotWidth = contentWidth / itemCount;
-                             return (
-                                <TouchableOpacity 
-                                    key={item.hour}
-                                    onPress={() => onSelectHour(selectedHour === item.hour ? null : item.hour)}
-                                    style={{ width: barSlotWidth, height: '100%' }}
-                                    activeOpacity={0.5}
-                                />
-                             );
-                         })}
-                    </View>
+                {/* Touch Overlay - Matches Slots Exactly */}
+                <View style={{ position: 'absolute', top: 0, left: 0, width: totalAvailableWidth, height: '100%', flexDirection: 'row' }}>
+                        {displayItems.map((item) => (
+                        <TouchableOpacity 
+                            key={item.hour}
+                            onPress={() => onSelectHour(selectedHour === item.hour ? null : item.hour)}
+                            style={{ width: barSlotWidth, height: '100%' }}
+                            activeOpacity={0.5}
+                        />
+                        ))}
                 </View>
-             </ScrollView>
+            </View>
         </View>
     );
 };

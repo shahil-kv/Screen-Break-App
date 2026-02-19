@@ -198,7 +198,7 @@ export const HomeScreen = () => {
       // Dynamic color logic matching chart
       if (minutes < 20) return "#4ade80"; // Green
       else if (minutes < 45) return "#facc15"; // Yellow
-      return "#f87171"; // Red
+      return "#ef4444"; // Red
   }, [selectedHour, dailyData]);
 
   if (isLoading && !dailyData) {
