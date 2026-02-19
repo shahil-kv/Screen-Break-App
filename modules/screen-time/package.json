@@ -1,0 +1,11 @@
+{
+  "name": "screen-time",
+  "version": "1.0.0",
+  "description": "Local Expo module for accessing Android Screen Time usage stats",
+  "main": "index.ts",
+  "types": "index.ts",
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*"
+  }
+}

@@ -17,6 +17,7 @@ export interface DailyUsage {
     date: number; // 1-31
     totalDuration: number;
     hourly: HourlyUsage[];
+    apps?: AppUsage[]; // Aggregated apps for the day
 }
 
 const APPS = [

@@ -1,29 +1,79 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { useBlocking } from '../../context/BlockingContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenTimeChart } from '../ScreenTimeChart';
-import { MOCK_DATA, AppUsage } from '../../utils/screenTimeData';
+import { ScreenTimeService } from '../../services/ScreenTimeService';
+import { DailyUsage, AppUsage, MOCK_DATA } from '../../utils/screenTimeData';
 import { DatePickerModal } from '../ui/DatePickerModal';
 
 // Optimized Sub-components
 import { DateStrip } from '../home/DateStrip';
 import { DailyOverview } from '../home/DailyOverview';
 import { AppUsageList } from '../home/AppUsageList';
+import { Platform, AppState } from 'react-native';
 
 export const HomeScreen = () => {
   const { isStrict, setStrict, triggerDemoBlock } = useBlocking();
-  const [selectedDate, setSelectedDate] = useState(14); 
+  const [selectedDate, setSelectedDate] = useState(new Date().getDate()); 
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   
+  // Real Data State
+  const [dailyData, setDailyData] = useState<DailyUsage | null>(null);
+  const [hasPermission, setHasPermission] = useState(false);
+
   // Date Picker State
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentYear, setCurrentYear] = useState(2026);
-  const [currentMonth, setCurrentMonth] = useState('Feb');
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().toLocaleString('default', { month: 'short' }));
 
-  const dailyData = MOCK_DATA[selectedDate];
+  // Load Data Effect
+  useEffect(() => {
+    checkPermissionAndLoadData();
+
+    // Reload when app comes to foreground
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        checkPermissionAndLoadData();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [selectedDate]);
+
+  const checkPermissionAndLoadData = async () => {
+    if (Platform.OS === 'android') {
+        const hasPerm = await ScreenTimeService.hasPermission();
+        setHasPermission(hasPerm);
+        
+        if (hasPerm) {
+            // Load for selected date
+            // Note: Our selectedDate is just a number (day of month), logic needs to map it to timestamp
+            // For MVP, we assume current month/year.
+            const date = new Date();
+            date.setDate(selectedDate);
+            const data = await ScreenTimeService.getDailyUsage(date.getTime());
+            setDailyData(data);
+        } else {
+             // Fallback to MOCK if no permission (or show empty)
+             // We will show a permission prompt banner instead locally
+             setDailyData(MOCK_DATA[selectedDate] ?? null);
+        }
+    } else {
+        // iOS / Other: Use MOCK
+        // Ensure we have data for the default valid date (14) if selectedDate doesn't exist in MOCK
+        setDailyData(MOCK_DATA[14]); 
+    }
+  };
+
+  const handleRequestPermission = () => {
+    ScreenTimeService.requestPermission();
+    // Re-check after a delay or on app foreground (handled by AppState)
+  };
   
   // Calculate displayed apps
   const displayedApps = useMemo(() => {
@@ -31,19 +81,28 @@ export const HomeScreen = () => {
       
       // If we are looking at a specific hour, show apps from that hour
       if (selectedHour !== null) {
-          let apps = dailyData.hourly[selectedHour].apps;
-          return apps;
+          if (dailyData.hourly && dailyData.hourly[selectedHour]) {
+              return dailyData.hourly[selectedHour].apps;
+          }
+          return [];
       } 
       
-      // Otherwise, show aggregated daily totals
+      // If we have pre-aggregated apps (from Native Module), use them
+      if (dailyData.apps && dailyData.apps.length > 0) {
+          return dailyData.apps;
+      }
+
+      // Otherwise, show aggregated daily totals from hourly data (Mock Data fallback)
       const appMap = new Map();
-      dailyData.hourly.forEach(h => {
-          h.apps.forEach(app => {
-              const existing = appMap.get(app.id) || { ...app, duration: 0 };
-              existing.duration += app.duration;
-              appMap.set(app.id, existing);
+      if (dailyData.hourly) {
+          dailyData.hourly.forEach(h => {
+              h.apps.forEach(app => {
+                  const existing = appMap.get(app.id) || { ...app, duration: 0 };
+                  existing.duration += app.duration;
+                  appMap.set(app.id, existing);
+              });
           });
-      });
+      }
       return Array.from(appMap.values()).sort((a, b) => b.duration - a.duration) as AppUsage[];
   }, [selectedDate, selectedHour, dailyData]);
 
