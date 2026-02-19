@@ -17,7 +17,7 @@ export const ScreenTimeService = {
     },
 
     async getInstalledApps(): Promise<{ [packageName: string]: { label: string; icon: string } }> {
-        // if (appCache) return appCache; // Cache needs update too
+        if (appCache) return appCache;
 
         if (Platform.OS !== 'android') return {};
 
@@ -30,7 +30,7 @@ export const ScreenTimeService = {
                     icon: app.icon
                 };
             });
-            // appCache = map; // Update cache logic if needed
+            appCache = map;
             return map;
         } catch (e) {
             console.error("Failed to get installed apps", e);
@@ -61,7 +61,7 @@ export const ScreenTimeService = {
                 daily?: Record<string, number>;
             };
 
-            console.log("LOG_RAW_NATIVE_DATA", JSON.stringify(result, null, 2));
+
 
             const hourlyMapNative: Record<string, Record<string, number>> = result.hourly || {};
             const dailyTotalMapNative: Record<string, number> = result.daily || {};
@@ -70,23 +70,26 @@ export const ScreenTimeService = {
             const appMap = await this.getInstalledApps();
 
             // Blocklist: System apps to exclude from time calculation
-            // User feedback: "System screen time is 2h 8m, ours is 1h 8m". The difference is likely the Home Screen.
-            // Action: UNBLOCK Launchers to match System Digital Wellbeing.
+            // To match Digital Wellbeing:
+            // 1. BLOCK Launchers (Home Screen)
+            // 2. ALLOW Settings
             const SYSTEM_PACKAGES = [
-                // 'com.sec.android.app.launcher', // Samsung One UI Home - ALLOW
-                // 'com.android.launcher', // ALLOW
-                // 'com.google.android.apps.nexuslauncher', // Pixel Launcher - ALLOW
-                'com.android.systemui', // Status bar / Notification shade - Keep blocked? Usually DWB counts it? Let's block it for now to avoid "System UI" spam.
-                'com.android.settings',
-                'com.android.settings.intelligence',
-                'com.samsung.android.lool', // Device Care
-                'android', // System
-                'com.google.android.googlequicksearchbox', // Google App (sometimes background)
-                'com.samsung.android.app.galaxyfinder' // Finder
+                'com.sec.android.app.launcher', // Samsung One UI Home - BLOCK
+                'com.android.launcher', // Generic Launcher - BLOCK
+                'com.google.android.apps.nexuslauncher', // Pixel Launcher - BLOCK
+                'com.android.systemui', // Status bar / Notification shade - BLOCK
+                // 'com.android.settings', // Settings - ALLOW
+                // 'com.android.settings.intelligence', // Settings Suggestions - ALLOW
+                'com.samsung.android.lool', // Device Care - BLOCK (Background service usually)
+                'android', // System Resources - BLOCK
+                'com.google.android.googlequicksearchbox', // Google App/Discover - BLOCK (Often background/feed)
+                'com.samsung.android.app.galaxyfinder', // Finder - BLOCK
+                'com.samsung.android.forest', // Samsung Digital Wellbeing - BLOCK (OS doesn't count itself)
+                'com.google.android.apps.wellbeing' // Google Digital Wellbeing - BLOCK
             ];
 
             const isSystemApp = (pkg: string) => {
-                // Only block explicitly listed system packages, allow launchers
+                // Block if it's in the list
                 return SYSTEM_PACKAGES.includes(pkg);
             };
 

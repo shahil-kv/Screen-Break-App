@@ -7,16 +7,14 @@ interface AppListItemProps {
   app: AppUsage;
   isSelected: boolean;
   onPress: (appId: string) => void;
+  overrideColor?: string;
 }
 
 // Memoized Individual App Item to prevent re-rendering entire list when one item changes selection
-const AppListItem = memo(({ app, isSelected, onPress }: AppListItemProps) => {
-  const appColor = app.color || "#3b82f6"; // Default to blue-500 like the screenshot
-  const maxDuration = 3600 * 2; // Assume 2h max for progress bar scaling, or dynamic? using static 100% for now relative to something? 
-  // Actually, standard progress bars usually relative to total time or a max value. 
-  // For individual app list, maybe just visual logic? 
-  // Screenshot shows bar filling up. Let's assume max is relative to 1 hour or the app's own scale? 
-  // Screenshot: "36m" bar is about 60%. So maybe 1 hour scale.
+const AppListItem = memo(({ app, isSelected, onPress, overrideColor }: AppListItemProps) => {
+  const appColor = overrideColor || app.color || "#3b82f6"; // Use override if present (e.g. Red for high usage hour)
+  // Progress bar scale: Assumes 1 hour max for visual proportion relative to full width
+
 
   return (
     <TouchableOpacity 
@@ -74,9 +72,10 @@ interface AppUsageListProps {
   apps: AppUsage[];
   selectedAppId: string | null;
   onAppPress: (appId: string) => void;
+  overrideColor?: string;
 }
 
-export const AppUsageList = memo(({ apps, selectedAppId, onAppPress }: AppUsageListProps) => {
+export const AppUsageList = memo(({ apps, selectedAppId, onAppPress, overrideColor }: AppUsageListProps) => {
   return (
     <View className="mt-2">
       {apps.map((app, index) => (
@@ -85,6 +84,7 @@ export const AppUsageList = memo(({ apps, selectedAppId, onAppPress }: AppUsageL
           app={app}
           isSelected={selectedAppId === app.id}
           onPress={onAppPress}
+          overrideColor={overrideColor}
         />
       ))}
       {apps.length === 0 && (
