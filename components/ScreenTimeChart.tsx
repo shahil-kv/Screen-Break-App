@@ -117,7 +117,7 @@ export const ScreenTimeChart: React.FC<Props> = ({ selectedDate, selectedHour, s
                         // If bars are too thin (<25px), show fewer labels to avoid overlapping
                         const isSelected = selectedHour === item.hour;
                         const showLabel = barSlotWidth > 25 || index % 2 === 0 || isSelected;
-                        const labelText = item.hour === 0 ? '12A' : item.hour === 12 ? '12P' : item.hour > 12 ? `${item.hour-12}P` : `${item.hour}A`;
+                        const labelText = item.hour === 0 ? '12AM' : item.hour === 12 ? '12PM' : item.hour > 12 ? `${item.hour-12}PM` : `${item.hour}AM`;
 
                         // Opacity: If something is selected, fade others.
                         const opacity = selectedHour !== null && !isSelected ? 0.3 : 1;
