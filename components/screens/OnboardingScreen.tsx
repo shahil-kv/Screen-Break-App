@@ -1,30 +1,34 @@
 import React, { useState } from 'react';
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { WelcomeStep } from './onboarding/WelcomeStep';
 import { SoundFamiliarStep } from './onboarding/SoundFamiliarStep';
 import { ScreenTimeGoalStep } from './onboarding/ScreenTimeGoalStep';
+import { PermissionStep } from './onboarding/PermissionStep';
+import { ScreenTimeReportStep } from './onboarding/ScreenTimeReportStep';
+import { AppUsageStep } from './onboarding/AppUsageStep';
+import { ScreenTimeComparisonStep } from './onboarding/ScreenTimeComparisonStep';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const OnboardingScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [currentStep, setCurrentStep] = useState(0);
   const [screenTimeGoal, setScreenTimeGoal] = useState(4);
 
-  // Temporary total steps until we define all 5-6
-  const TOTAL_STEPS = 3; 
+  const TOTAL_STEPS = 7; 
 
-  const handleNext = async () => {
+  const handleNext = () => {
     if (currentStep < TOTAL_STEPS - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Logic for final step (commented out for now to keep testing loop as requested)
-      // await AsyncStorage.setItem('hasLaunched', 'true');
-      // navigation.replace('Main');
-      
-      // For now, just reset to 0 or do nothing so user can see flow again on reload
-      console.log("End of current onboarding flow");
+        handleFinishOnboarding();
     }
+  };
+
+  const handleFinishOnboarding = async () => {
+    await AsyncStorage.setItem('hasLaunched', 'true');
+    navigation.replace('Main');
   };
 
   return (
@@ -37,6 +41,21 @@ export const OnboardingScreen = () => {
             screenTimeGoal={screenTimeGoal}
             setScreenTimeGoal={setScreenTimeGoal}
         />
+      )}
+      {currentStep === 3 && (
+        <PermissionStep onPermissionGranted={handleNext} />
+      )}
+      {currentStep === 4 && (
+        <ScreenTimeReportStep 
+            onNext={handleNext} 
+            screenTimeGoal={screenTimeGoal}
+        />
+      )}
+      {currentStep === 5 && (
+        <AppUsageStep onNext={handleNext} />
+      )}
+      {currentStep === 6 && (
+        <ScreenTimeComparisonStep onNext={handleNext} />
       )}
     </SafeAreaView>
   );
