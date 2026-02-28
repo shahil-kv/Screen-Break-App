@@ -67,14 +67,10 @@ export default function App() {
         
         const value = await AsyncStorage.getItem('hasLaunched');
         
-        // FOR DEV: Force onboarding every time
-        setIsFirstLaunch(true);
-        return;
-
-        if (value === null) {
-          setIsFirstLaunch(true);
-        } else {
+        if (value === 'true') {
           setIsFirstLaunch(false);
+        } else {
+          setIsFirstLaunch(true);
         }
       } catch (error) {
          console.error('Error checking first launch:', error);
