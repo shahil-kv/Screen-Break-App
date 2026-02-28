@@ -7,10 +7,14 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface ReclaimTimeStepProps {
   onNext: () => void;
+  preFetchedData?: any;
 }
 
-export const ReclaimTimeStep: React.FC<ReclaimTimeStepProps> = ({ onNext }) => {
-  const [loading, setLoading] = useState(true);
+export const ReclaimTimeStep: React.FC<ReclaimTimeStepProps> = ({ 
+  onNext,
+  preFetchedData
+}) => {
+  const [loading, setLoading] = useState(!preFetchedData);
   const [todaySeconds, setTodaySeconds] = useState(0);
   const { width } = Dimensions.get('window');
 
@@ -19,25 +23,32 @@ export const ReclaimTimeStep: React.FC<ReclaimTimeStepProps> = ({ onNext }) => {
   const MAX_HOURS = 8; // Max scale for the chart
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const now = new Date();
-        const startOfDay = new Date(now.setHours(0, 0, 0, 0)).getTime();
-        const endOfDay = new Date(now.setHours(23, 59, 59, 999)).getTime();
-
-        const stats = await getUsageStats(startOfDay, endOfDay);
-        const totalDuration = Object.values(stats.daily || {}).reduce((sum, val) => (sum as number) + (val as number), 0);
-        setTodaySeconds((totalDuration as number) / 1000);
-      } catch (e) {
-        console.error("Failed to fetch today's usage for reclaim step", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    if (preFetchedData && preFetchedData.weekHistory) {
+      const todayData = preFetchedData.weekHistory[preFetchedData.weekHistory.length - 1];
+      setTodaySeconds(todayData ? todayData.duration : 0);
+      setLoading(false);
+      return;
+    }
     fetchData();
-  }, []);
+  }, [preFetchedData]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const now = new Date();
+      const startOfDay = new Date(now.setHours(0, 0, 0, 0)).getTime();
+      const endOfDay = new Date(now.setHours(23, 59, 59, 999)).getTime();
+
+      const stats = await getUsageStats(startOfDay, endOfDay);
+      const dailyStats: Record<string, number> = stats.daily || {};
+      const totalDuration = Object.values(dailyStats).reduce((sum: number, val: number) => sum + val, 0);
+      setTodaySeconds(totalDuration / 1000);
+    } catch (e) {
+      console.error("Failed to fetch today's usage for reclaim step", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -162,7 +173,7 @@ export const ReclaimTimeStep: React.FC<ReclaimTimeStepProps> = ({ onNext }) => {
       <View className="space-y-4 mb-auto">
         {benefits.map((benefit, index) => (
           <View key={index} className="flex-row items-start space-x-3 mb-2">
-            <View className="bg-[#00c853] rounded-full p-1 mt-1">
+            <View className="bg-[#00c853] rounded-full p-1 mt-1 mr-2">
               <Ionicons name="checkmark" size={16} color="black" />
             </View>
             <View className="flex-1">

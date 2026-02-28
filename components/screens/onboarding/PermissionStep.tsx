@@ -16,12 +16,20 @@ export const PermissionStep: React.FC<PermissionStepProps> = ({ onPermissionGran
     }
   };
 
-  const handleGivePermission = () => {
-    requestPermission();
-    setChecking(true);
+  const handleGivePermission = async () => {
+    const granted = await hasPermission();
+    if (granted) {
+      onPermissionGranted();
+    } else {
+      requestPermission();
+      setChecking(true);
+    }
   };
 
   useEffect(() => {
+    // Initial check on mount
+    checkPermissionAndProceed();
+
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active' && checking) {
         checkPermissionAndProceed();

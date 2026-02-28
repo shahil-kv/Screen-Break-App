@@ -5,6 +5,8 @@ import { formatDuration } from '../../../utils/screenTimeData';
 
 interface AppUsageStepProps {
   onNext: () => void;
+  preFetchedData?: any; // The raw or processed usage data
+  preFetchedApps?: any[]; // The list of installed apps
 }
 
 interface AppStats {
@@ -14,57 +16,68 @@ interface AppStats {
   duration: number; // in seconds
 }
 
-export const AppUsageStep: React.FC<AppUsageStepProps> = ({ onNext }) => {
-  const [loading, setLoading] = useState(true);
+export const AppUsageStep: React.FC<AppUsageStepProps> = ({ 
+  onNext,
+  preFetchedData,
+  preFetchedApps
+}) => {
+  const [loading, setLoading] = useState(!(preFetchedData && preFetchedApps));
   const [topApps, setTopApps] = useState<AppStats[]>([]);
   const { width } = Dimensions.get('window');
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Last 7 days range
-        const now = new Date();
-        const end = now.getTime();
-        const start = new Date(now.setDate(now.getDate() - 7)).getTime();
-
-        const [usageData, installedApps] = await Promise.all([
-          getUsageStats(start, end),
-          getInstalledApps()
-        ]);
-
-        const dailyStats = usageData.daily || {};
-        const appMap = new Map<string, { label: string, icon: string }>();
-        installedApps.forEach(app => {
-          appMap.set(app.packageName, { label: app.label, icon: app.icon });
-        });
-
-        // Combine and sort
-        const processedApps: AppStats[] = Object.entries(dailyStats)
-          .map(([pkg, duration]) => {
-            const appInfo = appMap.get(pkg);
-            return {
-              packageName: pkg,
-              label: appInfo?.label || pkg.split('.').pop() || 'Unknown',
-              icon: appInfo?.icon || null,
-              duration: (duration as number) / 1000
-            };
-          })
-          .filter(app => app.duration > 60) // At least 1 minute
-          .sort((a, b) => b.duration - a.duration)
-          .slice(0, 5);
-
-        setTopApps(processedApps);
-      } catch (e) {
-        console.error("Failed to fetch app usage data", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    if (preFetchedData && preFetchedApps) {
+      processData(preFetchedData.daily || preFetchedData, preFetchedApps);
+      setLoading(false);
+      return;
+    }
     fetchData();
-  }, []);
+  }, [preFetchedData, preFetchedApps]);
+
+  const processData = (dailyStats: any, allApps: any[]) => {
+    const appMap = new Map<string, { label: string, icon: string }>();
+    allApps.forEach(app => {
+      appMap.set(app.packageName, { label: app.label, icon: app.icon });
+    });
+
+    // Combine and sort
+    const processedApps: AppStats[] = Object.entries(dailyStats)
+      .map(([pkg, duration]) => {
+        const appInfo = appMap.get(pkg);
+        return {
+          packageName: pkg,
+          label: appInfo?.label || pkg.split('.').pop() || 'Unknown',
+          icon: appInfo?.icon || null,
+          duration: (duration as number) / 1000
+        };
+      })
+      .filter(app => app.duration > 60) // At least 1 minute
+      .sort((a, b) => b.duration - a.duration)
+      .slice(0, 5);
+
+    setTopApps(processedApps);
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      const now = new Date();
+      const end = now.getTime();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+
+      const [usageData, installedApps] = await Promise.all([
+        getUsageStats(start, end),
+        getInstalledApps()
+      ]);
+
+      processData(usageData.daily || {}, installedApps);
+    } catch (e) {
+      console.error("Failed to fetch app usage data", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (loading) {
     return (

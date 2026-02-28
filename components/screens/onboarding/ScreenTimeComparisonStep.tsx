@@ -4,38 +4,50 @@ import { getUsageStats } from '../../../modules/screen-time';
 
 interface ScreenTimeComparisonStepProps {
   onNext: () => void;
+  preFetchedData?: any;
 }
 
-export const ScreenTimeComparisonStep: React.FC<ScreenTimeComparisonStepProps> = ({ onNext }) => {
-  const [loading, setLoading] = useState(true);
+export const ScreenTimeComparisonStep: React.FC<ScreenTimeComparisonStepProps> = ({ 
+  onNext,
+  preFetchedData 
+}) => {
+  const [loading, setLoading] = useState(!preFetchedData);
   const [yearlyHours, setYearlyHours] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const { width } = Dimensions.get('window');
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const now = new Date();
-        const end = now.getTime();
-        const start = new Date(now.setDate(now.getDate() - 7)).getTime();
-
-        const usageData = await getUsageStats(start, end);
-        const dailyStats = usageData.daily || {};
-        const weeklyTotalSeconds = Object.values(dailyStats).reduce((sum, val) => (sum as number) + (val as number), 0) / 1000;
-        
-        // Project to a year
-        const projectedYearlyHours = Math.round((weeklyTotalSeconds / 7) * 365 / 3600);
-        setYearlyHours(projectedYearlyHours);
-      } catch (e) {
-        console.error("Failed to fetch usage data for comparison", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    if (preFetchedData) {
+      calculateYearly(preFetchedData.daily || preFetchedData);
+      setLoading(false);
+      return;
+    }
     fetchData();
-  }, []);
+  }, [preFetchedData]);
+
+  const calculateYearly = (dailyStats: Record<string, number>) => {
+    const weeklyTotalSeconds = Object.values(dailyStats).reduce((sum: number, val: number) => sum + val, 0) / 1000;
+    
+    // Project to a year
+    const projectedYearlyHours = Math.round((weeklyTotalSeconds / 7) * 365 / 3600);
+    setYearlyHours(projectedYearlyHours);
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const now = new Date();
+      const end = now.getTime();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).getTime();
+
+      const usageData = await getUsageStats(start, end);
+      calculateYearly(usageData.daily || {});
+    } catch (e) {
+      console.error("Failed to fetch usage data for comparison", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const comparisons = useMemo(() => [
     {

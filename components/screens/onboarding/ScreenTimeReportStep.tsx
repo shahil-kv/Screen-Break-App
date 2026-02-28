@@ -7,11 +7,16 @@ import { formatDuration } from '../../../utils/screenTimeData';
 interface ScreenTimeReportStepProps {
   onNext: () => void;
   screenTimeGoal: number; // in hours
+  preFetchedData?: { day: string, duration: number }[];
 }
 
-export const ScreenTimeReportStep: React.FC<ScreenTimeReportStepProps> = ({ onNext, screenTimeGoal }) => {
-  const [loading, setLoading] = useState(true);
-  const [weekData, setWeekData] = useState<{ day: string, duration: number }[]>([]);
+export const ScreenTimeReportStep: React.FC<ScreenTimeReportStepProps> = ({ 
+  onNext, 
+  screenTimeGoal,
+  preFetchedData 
+}) => {
+  const [loading, setLoading] = useState(!preFetchedData);
+  const [weekData, setWeekData] = useState<{ day: string, duration: number }[]>(preFetchedData || []);
   const [totalSeconds, setTotalSeconds] = useState(0);
   const [viewMode, setViewMode] = useState<'Day' | 'Week'>('Week');
 
@@ -39,31 +44,37 @@ export const ScreenTimeReportStep: React.FC<ScreenTimeReportStepProps> = ({ onNe
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Fetch each day's total usage
-        const dailyPromises = getDays.map(async (day) => {
-          const stats = await getUsageStats(day.startOfDay, day.endOfDay);
-          const totalDuration = Object.values(stats.daily || {}).reduce((sum, val) => (sum as number) + (val as number), 0);
-          return {
-            day: day.label,
-            duration: (totalDuration as number) / 1000 // duration from native is in ms
-          };
-        });
-
-        const results = await Promise.all(dailyPromises);
-        setWeekData(results);
-        setTotalSeconds(results.reduce((sum, d) => sum + d.duration, 0));
-      } catch (e) {
-        console.error("Failed to fetch screen time data", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+    if (preFetchedData && preFetchedData.length > 0) {
+      setWeekData(preFetchedData);
+      setTotalSeconds(preFetchedData.reduce((sum, d) => sum + d.duration, 0));
+      setLoading(false);
+      return;
+    }
     fetchData();
-  }, [getDays]);
+  }, [preFetchedData]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      // Fetch each day's total usage
+      const dailyPromises = getDays.map(async (day) => {
+        const stats = await getUsageStats(day.startOfDay, day.endOfDay);
+        const totalDuration = Object.values(stats.daily || {}).reduce((sum, val) => (sum as number) + (val as number), 0);
+        return {
+          day: day.label,
+          duration: (totalDuration as number) / 1000 // duration from native is in ms
+        };
+      });
+
+      const results = await Promise.all(dailyPromises);
+      setWeekData(results);
+      setTotalSeconds(results.reduce((sum, d) => sum + d.duration, 0));
+    } catch (e) {
+      console.error("Failed to fetch screen time data", e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredWeekData = useMemo(() => {
     return weekData.filter(d => d.duration >= 300); // Only show days >= 5 mins
