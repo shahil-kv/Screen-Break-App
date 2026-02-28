@@ -30,82 +30,78 @@ const RemoteExtension = ({ extensionId, script }: { extensionId: string; script:
   const [debugLog, setDebugLog] = React.useState<string[]>([]);
 
   React.useEffect(() => {
-    try {
-        // The bundle is an IIFE that sets a global variable: global.Extension_[id]
-        // We inject a shim 'require' to resolve React and React Native
-        const globalName = `Extension_${extensionId.replace(/-/g, '_')}`;
-        const ScreenBreak = (globalThis as any).ScreenBreak;
+    // Determine the global var name injected by esbuild
+    const globalName = `Extension_${extensionId.replace(/-/g, '_')}`;
 
-        // Bypassing Hermes Descriptor Bug:
-        // By creating a brand new object and manually assigning functions,
-        // we prevent Hermes from collapsing module namespace getters into strings.
-        const flattenedReact: any = { ...React };
-        flattenedReact.useState = React.useState;
-        flattenedReact.useEffect = React.useEffect;
-        flattenedReact.useMemo = React.useMemo;
-        flattenedReact.useCallback = React.useCallback;
-        flattenedReact.useRef = React.useRef;
-        
-        const flattenedRN: any = { ...ReactNative };
-        
-        const customRequire = (name: string) => {
-          if (name === 'react') return flattenedReact;
-          if (name === 'react-native') return flattenedRN;
-          return (globalThis as any)[name];
-        };
-        
-        const logs = [
-          `🛡️ SHIELD ACTIVE`,
-          `React.useState type: ${typeof flattenedReact.useState}`
-        ];
-        console.log(logs.join('\\n'));
-        setDebugLog(logs);
+    // Clear previous state if extensionId changes
+    setComponent(null);
+    setError(null);
+    
+    // A small timeout allows the UI transition animation to finish 
+    // before we block the JS thread compiling the remote extension.
+    const timer = setTimeout(() => {
+      try {
+          const ScreenBreak = (globalThis as any).ScreenBreak;
 
-        // Set global references as a secondary fallback
-        (globalThis as any).React = flattenedReact;
-        (globalThis as any).ReactNative = flattenedRN;
+          const flattenedReact: any = { ...React };
+          flattenedReact.useState = React.useState;
+          flattenedReact.useEffect = React.useEffect;
+          flattenedReact.useMemo = React.useMemo;
+          flattenedReact.useCallback = React.useCallback;
+          flattenedReact.useRef = React.useRef;
+          
+          const flattenedRN: any = { ...ReactNative };
+          
+          const customRequire = (name: string) => {
+            if (name === 'react') return flattenedReact;
+            if (name === 'react-native') return flattenedRN;
+            return (globalThis as any)[name];
+          };
+          
+          const logs = [
+            `🛡️ SHIELD ACTIVE`,
+            `React.useState type: ${typeof flattenedReact.useState}`
+          ];
 
-        // Append a return statement so new Function returns the IIFE result
-        const executableScript = script + '; return ' + globalName + ';';
+          (globalThis as any).React = flattenedReact;
+          (globalThis as any).ReactNative = flattenedRN;
 
-        const RemoteComp = new Function('React', 'ReactNative', 'ScreenBreak', 'require', 'global', executableScript)(
-          flattenedReact, 
-          flattenedRN,
-          ScreenBreak,
-          customRequire,
-          globalThis
-        );
+          const executableScript = script + '; return ' + globalName + ';';
 
-        if (RemoteComp) {
-            // Unwrap ES Module default export or named exports
-            let ActualComponent = RemoteComp;
-            
-            if (RemoteComp.default) {
-                console.log('📦 Found: Default Export');
-                ActualComponent = RemoteComp.default;
-            } else if (typeof RemoteComp === 'object') {
-                console.log('📦 Found: Object Export with keys:', Object.keys(RemoteComp));
-                // Find the first exported function (e.g. { IntelligentFocusMode: [Function] })
-                const firstFunction = Object.values(RemoteComp).find(val => typeof val === 'function');
-                if (firstFunction) {
-                    console.log(`📦 Extracted function from named export`);
-                    ActualComponent = firstFunction;
-                }
-            }
-            
-            if (typeof ActualComponent !== 'function') {
-               console.error('❌ Resolved component is not a function. Raw data:', RemoteComp);
-               throw new Error(`Resolved component is of type ${typeof ActualComponent}, expected function. Keys found: ${Object.keys(RemoteComp).join(', ')}`);
-            }
-            
-            setComponent(() => ActualComponent);
-        } else {
-            throw new Error(`Bundle loaded but component ${globalName} not found`);
-        }
-    } catch (e: any) {
-      console.error('❌ Remote Load Error:', e);
-      setError(e.toString());
-    }
+          const RemoteComp = new Function('React', 'ReactNative', 'ScreenBreak', 'require', 'global', executableScript)(
+            flattenedReact, 
+            flattenedRN,
+            ScreenBreak,
+            customRequire,
+            globalThis
+          );
+
+          if (RemoteComp) {
+              let ActualComponent = RemoteComp;
+              if (RemoteComp.default) {
+                  ActualComponent = RemoteComp.default;
+              } else if (typeof RemoteComp === 'object') {
+                  const firstFunction = Object.values(RemoteComp).find(val => typeof val === 'function');
+                  if (firstFunction) {
+                      ActualComponent = firstFunction;
+                  }
+              }
+              if (typeof ActualComponent !== 'function') {
+                throw new Error(`Resolved component is of type ${typeof ActualComponent}, expected function.`);
+              }
+              
+              setDebugLog(logs);
+              setComponent(() => ActualComponent);
+          } else {
+              throw new Error(`Bundle loaded but component ${globalName} not found`);
+          }
+      } catch (e: any) {
+        console.error('❌ Remote Load Error:', e);
+        setError(e.toString());
+      }
+    }, 50); // 50ms delay for UI smoothness
+
+    return () => clearTimeout(timer);
   }, [extensionId, script]);
 
   if (error) return (

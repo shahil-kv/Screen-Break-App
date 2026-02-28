@@ -1,63 +1,48 @@
 package com.shahil.myexpoapp
 
 import android.accessibilityservice.AccessibilityService
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
-import android.graphics.Paint
+import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import android.graphics.PixelFormat
-import android.view.Gravity
 
 class ScreenBreakAccessibilityService : AccessibilityService() {
 
     private var overlayView: View? = null
     private var windowManager: WindowManager? = null
-    private val overlayPaint = Paint()
 
-    // Listen for Intents from ScreenBreakModule
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == "com.shahil.myexpoapp.SET_GRAYSCALE") {
-                val level = intent.getFloatExtra("level", 0f)
-                setGrayscaleLevel(level)
-            }
-        }
+    companion object {
+        // A static reference so the React Native module can call us instantly
+        // without waiting for Android Intent Broadcasts.
+        var instance: ScreenBreakAccessibilityService? = null
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        Log.d("ScreenBreak", "Accessibility Service Connected!")
+        instance = this
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         
-        // Register the BroadcastReceiver
-        val filter = IntentFilter("com.shahil.myexpoapp.SET_GRAYSCALE")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(receiver, filter)
-        }
-
         setupOverlay()
     }
 
     private fun setupOverlay() {
-        if (overlayView != null) return
+        Log.d("ScreenBreak", "Setting up Overlay View...")
+        if (overlayView != null) {
+            return
+        }
 
-        overlayView = object : View(this) {
-            override fun onDraw(canvas: android.graphics.Canvas) {
-                super.onDraw(canvas)
-                // The Paint filter does the color math automatically using hardware acceleration
-                // It filters everything drawn *behind* this view.
-            }
-        }.apply {
+        overlayView = View(this).apply {
             isClickable = false
             isFocusable = false
+            // Start fully transparent
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
         }
 
         val params = WindowManager.LayoutParams(
@@ -75,46 +60,42 @@ class ScreenBreakAccessibilityService : AccessibilityService() {
         ).apply {
             gravity = Gravity.TOP or Gravity.START
         }
-
-        // We initially set it to completely transparent (no filter)
-        setGrayscaleLevel(0f)
         
         try {
             windowManager?.addView(overlayView, params)
+            Log.d("ScreenBreak", "Overlay successfully added to WindowManager.")
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("ScreenBreak", "Failed to add overlay view", e)
         }
     }
 
-    private fun setGrayscaleLevel(level: Float) {
-        if (overlayView == null) return
+    fun setGrayscaleLevel(level: Float) {
+        // Must run on the Main UI Thread since we are touching Views
+        Handler(Looper.getMainLooper()).post {
+            if (overlayView == null) return@post
 
-        // level = 0.0 (full color) to 1.0 (full grayscale)
-        // Ensure values are clamped
-        val boundedLevel = Math.max(0f, Math.min(1f, level))
-        
-        val colorMatrix = ColorMatrix()
-        colorMatrix.setSaturation(1f - boundedLevel)
-
-        overlayPaint.colorFilter = ColorMatrixColorFilter(colorMatrix)
-        
-        // To apply the filter to the screen, we set the view's layer type to hardware
-        // and apply the paint to the entire layer.
-        overlayView?.setLayerType(View.LAYER_TYPE_HARDWARE, overlayPaint)
-        overlayView?.invalidate()
+            val boundedLevel = Math.max(0f, Math.min(1f, level))
+            
+            // True Grayscale requires Root on Android. 
+            // Instead, we use a highly effective "Wash-out" tint overlay!
+            // When level is 1.0, we draw a 75% opaque dark-gray box.
+            // This instantly kills the vibrant colors of TikTok/Instagram, making them boring.
+            
+            val alphaInt = (boundedLevel * 0.75f * 255).toInt()
+            // A neutral dark gray that washes out bright colors
+            val color = android.graphics.Color.argb(alphaInt, 80, 80, 80)
+            
+            overlayView?.setBackgroundColor(color)
+            Log.d("ScreenBreak", "Applied wash-out overlay with alpha: $alphaInt")
+        }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // We do not need to process specific events for grayscale
-    }
-
-    override fun onInterrupt() {
-        // Required override, but nothing to do
-    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onInterrupt() {}
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterReceiver(receiver)
+        instance = null
         if (overlayView != null) {
             windowManager?.removeView(overlayView)
             overlayView = null

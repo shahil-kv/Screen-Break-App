@@ -29,6 +29,21 @@ const SDKProviderInstance: ScreenBreakSDK = {
     },
     setBlueLightFilter: async (enabled: boolean) => {
       console.log(`[SDK] Blue Light Filter: ${enabled}`);
+    },
+    openAccessibilitySettings: async () => {
+      console.log(`[SDK] Opening Accessibility Settings`);
+      if (NativeModules.ScreenBreak && NativeModules.ScreenBreak.openAccessibilitySettings) {
+        NativeModules.ScreenBreak.openAccessibilitySettings();
+      } else {
+        console.warn(`[SDK] Native Module 'openAccessibilitySettings' not available.`);
+      }
+    },
+    hasAccessibilityPermission: async () => {
+      // Ask Android if the user has physically enabled the Screen Break Accessibility service
+      if (NativeModules.ScreenBreak && NativeModules.ScreenBreak.isAccessibilityServiceEnabled) {
+        return await NativeModules.ScreenBreak.isAccessibilityServiceEnabled();
+      }
+      return false;
     }
   },
   

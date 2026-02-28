@@ -20,6 +20,17 @@ export interface VisualsAPI {
      * Toggles the "Night Mode" filter.
      */
     setBlueLightFilter: (enabled: boolean) => Promise<void>;
+
+    /**
+     * Opens the Android Accessibility Settings page to grant the app permission
+     * to draw the system-wide grayscale overlay.
+     */
+    openAccessibilitySettings: () => Promise<void>;
+
+    /**
+     * Checks if the Accessibility Service is explicitly enabled by the user in Android Settings.
+     */
+    hasAccessibilityPermission: () => Promise<boolean>;
 }
 
 export interface ChallengesAPI {
