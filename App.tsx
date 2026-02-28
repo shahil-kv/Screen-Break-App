@@ -30,7 +30,12 @@ import { FluidTabBar } from './components/navigation/FluidTabBar';
 import './global.css';
 
 // Build 0.81.5 has fixed safeAreaView but dependencies might still use it
-LogBox.ignoreLogs([/SafeAreaView has been deprecated/]);
+LogBox.ignoreLogs([
+  /SafeAreaView has been deprecated/,
+  /ProgressBarAndroid has been extracted/,
+  /Clipboard has been extracted/,
+  /PushNotificationIOS has been extracted/
+]);
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
