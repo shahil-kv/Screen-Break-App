@@ -16,6 +16,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts, Outfit_400Regular, Outfit_700Bold } from '@expo-google-fonts/outfit';
+import './core/sdk/provider'; // Initialize the SDK Global
 
 import { Ionicons } from '@expo/vector-icons';
 import { BlockingProvider } from './context/BlockingContext';

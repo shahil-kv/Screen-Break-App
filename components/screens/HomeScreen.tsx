@@ -83,6 +83,19 @@ export const HomeScreen = () => {
                 date.setDate(selectedDate);
                 const data = await ScreenTimeService.getDailyUsage(date.getTime());
                 setDailyData(data);
+
+                // Update the Extension SDK
+                // This part assumes ScreenTimeService can provide the necessary stats
+                // and that the SDK provider is accessible.
+                // For this example, we'll use a simplified structure based on `data`.
+                const { updateSDKState } = require('../../core/sdk/provider');
+                const totalMinutes = data?.totalDuration ? data.totalDuration / 60 : 0;
+                const appUsageMap = data?.apps ? Object.fromEntries(data.apps.map(a => [a.name, a.duration / 60])) : {};
+
+                updateSDKState({
+                    todayTotalMinutes: totalMinutes,
+                    appUsage: appUsageMap
+                });
             } else {
                  setDailyData(MOCK_DATA[selectedDate] ?? null);
             }
