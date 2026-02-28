@@ -5,8 +5,82 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import MARKETPLACE_REGISTRY from '../../assets/marketplace.gen.json';
 import { GreyscaleFader } from '../../extensions/greyscale-fader/GreyscaleFader';
+import * as ScreenBreakSDK from '../../core/sdk';
 
-const MARKETPLACE_URL = 'https://shahil-kv.github.io/Unlink-App-Android-Extensions/marketplace.json';
+// Expose SDK globally for remote bundles to access
+(global as any).ScreenBreak = ScreenBreakSDK.ScreenBreak;
+
+const EXTENSION_COMPONENTS: Record<string, React.ComponentType> = {
+  'greyscale-fader': GreyscaleFader,
+
+};
+
+const BASE_URL = 'https://shahil-kv.github.io/Unlink-App-Android-Extensions';
+const MARKETPLACE_URL = `${BASE_URL}/marketplace.json`;
+
+/**
+ * RemoteExtension Component
+ * Dynamically loads and renders a JS bundle from a URL
+ */
+const RemoteExtension = ({ bundlePath, extensionId }: { bundlePath: string, extensionId: string }) => {
+  const [Component, setComponent] = React.useState<React.ComponentType | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const loadBundle = async () => {
+      try {
+        const url = `${BASE_URL}/${bundlePath}`;
+        console.log(`📡 Fetching bundle: ${url}`);
+        const response = await fetch(url);
+        const script = await response.text();
+
+        // The bundle is an IIFE that sets a global variable: global.Extension_[id]
+        // We inject React, ReactNative, and ScreenBreak into the function scope
+        const globalName = `Extension_${extensionId.replace(/-/g, '_')}`;
+        const ScreenBreak = (global as any).ScreenBreak;
+        
+        new Function('React', 'ReactNative', 'ScreenBreak', script)(
+          React, 
+          require('react-native'),
+          ScreenBreak
+        );
+        
+        const RemoteComp = (global as any)[globalName];
+        
+        if (RemoteComp) {
+          // If it's an object with a default export or the component itself
+          setComponent(() => RemoteComp.default || RemoteComp);
+        } else {
+          throw new Error('Bundle loaded but component not found in global scope');
+        }
+      } catch (err: any) {
+        console.error('❌ Remote Load Error:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadBundle();
+  }, [bundlePath, extensionId]);
+
+  if (loading) return (
+    <View className="p-8 items-center justify-center bg-zinc-900 rounded-3xl border border-zinc-800">
+      <View className="w-6 h-6 rounded-full border-2 border-[#ff006e] border-t-transparent animate-spin mb-3" />
+      <Text className="text-zinc-500 text-xs font-bold uppercase tracking-widest">Installing Bundle...</Text>
+    </View>
+  );
+
+  if (error) return (
+    <View className="p-6 bg-red-500/10 rounded-3xl border border-red-500/20 items-center">
+      <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#ef4444" />
+      <Text className="text-red-500 text-xs mt-2 text-center">Failed to load extension: {error}</Text>
+    </View>
+  );
+
+  return Component ? React.createElement(Component) : null;
+};
 
 export const ExtensionsScreen = () => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
@@ -234,16 +308,13 @@ export const ExtensionsScreen = () => {
               
               {selectedId === item.id && (
                 <View className="mt-2">
-                   {item.id === 'greyscale-fader' ? (
-                     <GreyscaleFader />
+                   {EXTENSION_COMPONENTS[item.id] ? (
+                     React.createElement(EXTENSION_COMPONENTS[item.id])
                    ) : (
-                    <View className="bg-[#1c1c1e] p-6 rounded-3xl border border-gray-800 items-center">
-                      <MaterialCommunityIcons name="puzzle-outline" size={32} color="#4b5563" />
-                      <Text className="text-gray-500 text-center mt-2">This community extension is available for download.</Text>
-                      <TouchableOpacity className="bg-[#ff006e] px-8 py-3 rounded-full mt-4">
-                        <Text className="text-white font-bold">Install Bundle</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <RemoteExtension 
+                      bundlePath={item.bundlePath} 
+                      extensionId={item.id} 
+                    />
                    )}
                 </View>
               )}
