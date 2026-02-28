@@ -6,6 +6,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import MARKETPLACE_REGISTRY from '../../assets/marketplace.gen.json';
 import { GreyscaleFader } from '../../extensions/greyscale-fader/GreyscaleFader';
 
+const MARKETPLACE_URL = 'https://shahil-kv.github.io/Unlink-App-Android-Extensions/marketplace.json';
+
 export const ExtensionsScreen = () => {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [activeCategory, setActiveCategory] = React.useState('All');
@@ -13,9 +15,11 @@ export const ExtensionsScreen = () => {
   const [localUrl, setLocalUrl] = React.useState('');
   const [titleTaps, setTitleTaps] = React.useState(0);
   const [localExtension, setLocalExtension] = React.useState<any>(null);
+  const [remoteRegistry, setRemoteRegistry] = React.useState<any[]>([]);
   const [isScannerVisible, setIsScannerVisible] = React.useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const wsRef = React.useRef<WebSocket | null>(null);
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   const handleTitlePress = () => {
     const newTaps = titleTaps + 1;
@@ -45,6 +49,26 @@ export const ExtensionsScreen = () => {
       loadLocalExtension(result.data);
     }
   };
+
+  const syncMarketplace = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch(MARKETPLACE_URL);
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setRemoteRegistry(data);
+        console.log('✅ Marketplace synced with', data.length, 'extensions');
+      }
+    } catch (err) {
+      console.log('⚠️ Failed to sync live marketplace, using local cache.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  React.useEffect(() => {
+    syncMarketplace();
+  }, []);
 
   React.useEffect(() => {
     if (!devMode || !localUrl) {
@@ -80,7 +104,7 @@ export const ExtensionsScreen = () => {
 
   const filteredExtensions = [
     ...(localExtension ? [localExtension] : []),
-    ...MARKETPLACE_REGISTRY
+    ...(remoteRegistry.length > 0 ? remoteRegistry : MARKETPLACE_REGISTRY)
   ].filter(item => 
     activeCategory === 'All' || item.category === activeCategory
   );
@@ -92,9 +116,17 @@ export const ExtensionsScreen = () => {
           <TouchableOpacity onPress={handleTitlePress} activeOpacity={1}>
             <Text className="text-3xl font-bold text-white" style={{ fontFamily: 'Outfit_700Bold' }}>Marketplace</Text>
           </TouchableOpacity>
-          <TouchableOpacity className="bg-[#1c1c1e] p-2 rounded-full">
-            <Ionicons name="search" size={20} color="white" />
-          </TouchableOpacity>
+          <View className="flex-row items-center">
+            {isSyncing && (
+              <View className="mr-3 flex-row items-center">
+                <View className="w-1.5 h-1.5 rounded-full bg-[#ff006e] mr-1 animate-pulse" />
+                <Text className="text-[#ff006e] text-[10px] font-bold uppercase">Syncing</Text>
+              </View>
+            )}
+            <TouchableOpacity className="bg-[#1c1c1e] p-2 rounded-full">
+              <Ionicons name="search" size={20} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
         <Text className="text-gray-500 mb-2" style={{ fontFamily: 'Outfit_400Regular' }}>Enhance your focus with community builds</Text>
         
