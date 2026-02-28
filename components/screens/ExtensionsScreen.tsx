@@ -135,13 +135,19 @@ const RemoteExtension = ({ extensionId, script }: { extensionId: string; script:
 export const ExtensionsScreen = () => {
   const [extensions, setExtensions] = React.useState<Extension[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState<'marketplace' | 'installed'>('marketplace');
-  const [installedIds, setInstalledIds] = React.useState<string[]>([]);
   const [activeExtension, setActiveExtension] = React.useState<Extension | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [isRefreshing, setIsRefreshing] = React.useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [showScanner, setShowScanner] = React.useState(false);
+
+  // Filter based on search
+  const filteredExtensions = React.useMemo(() => {
+    if (!searchQuery.trim()) return extensions;
+    return extensions.filter(e => 
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      e.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [extensions, searchQuery]);
 
   const fetchExtensions = async () => {
     try {
@@ -161,7 +167,6 @@ export const ExtensionsScreen = () => {
       console.error('Error fetching extensions:', error);
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
     }
   };
 
@@ -190,8 +195,8 @@ export const ExtensionsScreen = () => {
     if (!permission) return <View />;
     if (!permission.granted) {
       return (
-        <RNSafeAreaView className="flex-1 bg-white items-center justify-center p-6">
-          <Text className="text-center text-lg mb-6">We need your permission to show the camera</Text>
+        <RNSafeAreaView className="flex-1 bg-black items-center justify-center p-6">
+          <Text className="text-center text-lg text-white mb-6">We need your permission to show the camera</Text>
           <TouchableOpacity 
             className="bg-pink-500 px-6 py-3 rounded-2xl"
             onPress={requestPermission}
@@ -212,7 +217,7 @@ export const ExtensionsScreen = () => {
         />
         <RNSafeAreaView className="absolute top-0 left-0 right-0 p-4">
           <TouchableOpacity 
-            className="bg-white/20 w-12 h-12 rounded-full items-center justify-center"
+            className="bg-black/50 w-12 h-12 rounded-full items-center justify-center border border-white/20"
             onPress={() => setShowScanner(false)}
           >
             <Ionicons name="close" size={28} color="white" />
@@ -223,122 +228,157 @@ export const ExtensionsScreen = () => {
   }
 
   return (
-    <RNSafeAreaView className="flex-1 bg-gray-50">
-      <View className="px-6 pt-4 pb-2">
-        <View className="flex-row items-center justify-between mb-4">
+    <RNSafeAreaView className="flex-1 bg-black" edges={['top']}>
+        <View className="flex-row items-center justify-between px-6 pt-6 pb-4">
           <View>
-            <Text className="text-3xl font-bold text-gray-900 tracking-tight">Extensions</Text>
-            <Text className="text-gray-500 text-sm mt-0.5">Customize your focus experience</Text>
+            <Text className="text-4xl font-bold text-white tracking-tight">Extensions</Text>
+            <Text className="text-gray-400 text-sm mt-1">Supercharge your focus workflow</Text>
           </View>
-          <TouchableOpacity 
-            className="w-10 h-10 rounded-full items-center justify-center"
-            onPress={() => setShowScanner(true)}
-          >
-            <Ionicons name="qr-code-outline" size={24} color="#000" />
-          </TouchableOpacity>
         </View>
 
-        <View className="flex-row mb-6 border-b border-gray-200">
-          <TouchableOpacity 
-            onPress={() => setActiveTab('marketplace')}
-            className={`mr-6 pb-2 border-b-2 ${activeTab === 'marketplace' ? 'border-black' : 'border-transparent'}`}
-          >
-            <Text className={`font-semibold ${activeTab === 'marketplace' ? 'text-black' : 'text-gray-400'}`}>Marketplace</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={() => setActiveTab('installed')}
-            className={`pb-2 border-b-2 ${activeTab === 'installed' ? 'border-black' : 'border-transparent'}`}
-          >
-            <Text className={`font-semibold ${activeTab === 'installed' ? 'text-black' : 'text-gray-400'}`}>Installed</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false}>
+      <ScrollView className="flex-1 px-6" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {activeExtension ? (
-          <View className="mb-8 p-4 bg-white rounded-2xl border border-gray-200">
-            <View className="flex-row items-center justify-between mb-6">
-                <View className="flex-row items-center">
-                    <View className="w-12 h-12 bg-gray-100 rounded-xl items-center justify-center mr-4">
+          <View className="mb-8 p-5 bg-[#0f0f0f] rounded-3xl border border-gray-800 shadow-xl shadow-black">
+            <View className="flex-row items-start justify-between mb-6">
+                <View className="flex-row items-center flex-1 pr-4">
+                    <View className="w-16 h-16 bg-[#1a1a1a] rounded-2xl items-center justify-center mr-4 border border-gray-800">
                         {activeExtension.iconType === 'Ionicons' ? (
-                            <Ionicons name={activeExtension.icon as any} size={24} color="#000" />
+                            <Ionicons name={activeExtension.icon as any} size={30} color="#ff006e" />
                         ) : activeExtension.iconType === 'MaterialCommunityIcons' ? (
-                            <MaterialCommunityIcons name={activeExtension.icon as any} size={24} color="#000" />
+                            <MaterialCommunityIcons name={activeExtension.icon as any} size={30} color="#ff006e" />
                         ) : (
-                            <FontAwesome5 name={activeExtension.icon as any} size={20} color="#000" />
+                            <FontAwesome5 name={activeExtension.icon as any} size={26} color="#ff006e" />
                         )}
                     </View>
-                    <View>
-                        <Text className="text-xl font-bold text-black">{activeExtension.title}</Text>
-                        <Text className="text-gray-500 text-xs mt-0.5">{activeExtension.description}</Text>
+                    <View className="flex-1">
+                        <Text className="text-2xl font-bold text-white mb-1">{activeExtension.title}</Text>
+                        <Text className="text-gray-400 text-xs leading-5 pr-2">{activeExtension.description}</Text>
                     </View>
                 </View>
-                <TouchableOpacity onPress={() => setActiveExtension(null)} className="p-2">
-                    <Ionicons name="close-circle" size={28} color="#000" />
+                <TouchableOpacity onPress={() => setActiveExtension(null)} className="bg-[#1a1a1a] rounded-full w-10 h-10 items-center justify-center border border-gray-800">
+                    <Ionicons name="close" size={20} color="white" />
                 </TouchableOpacity>
             </View>
             
-            <RemoteExtension extensionId={activeExtension.id} script={activeExtension.bundleUrl!} />
+            <View className="mt-2">
+              <RemoteExtension extensionId={activeExtension.id} script={activeExtension.bundleUrl!} />
+            </View>
           </View>
         ) : (
           <>
-            <View className="bg-white rounded-2xl flex-row items-center px-4 py-3 mb-6 shadow-sm border border-gray-100">
-              <Ionicons name="search" size={20} color="#9ca3af" />
+            <View className="bg-[#121212] rounded-2xl flex-row items-center px-4 py-4 mb-6 border border-gray-800">
+              <Ionicons name="search" size={20} color="#6b7280" />
               <TextInput 
-                className="flex-1 ml-3 text-gray-900" 
-                placeholder="Search extensions..." 
-                placeholderTextColor="#9ca3af"
+                className="flex-1 ml-3 text-white font-medium" 
+                placeholder="Search tools..." 
+                placeholderTextColor="#6b7280"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
             </View>
 
-            <View className="mb-8">
-              <View className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <View className="mb-6">
                 {loading ? (
                   <View className="p-12 items-center">
-                    <ActivityIndicator color="#000" />
+                    <ActivityIndicator color="#ff006e" size="large" />
+                    <Text className="text-gray-500 mt-4 font-medium">Scanning catalog...</Text>
                   </View>
-                ) : extensions.length === 0 ? (
-                  <View className="p-12 items-center">
-                    <Text className="text-gray-400">No extensions found</Text>
+                ) : filteredExtensions.length === 0 ? (
+                  <View className="p-12 items-center bg-[#121212] rounded-3xl border border-gray-800">
+                    <Ionicons name="folder-open-outline" size={48} color="#374151" className="mb-4" />
+                    <Text className="text-gray-400 font-medium">No extensions found</Text>
                   </View>
                 ) : (
-                  extensions.map((ext, index) => (
-                    <TouchableOpacity 
-                      key={ext.id} 
-                      onPress={() => handleExtensionClick(ext)}
-                      className={`flex-row items-center p-4 ${index !== extensions.length - 1 ? 'border-b border-gray-100' : ''}`}
-                    >
-                      <View className="w-10 h-10 bg-gray-50 rounded-lg items-center justify-center mr-4">
-                        {ext.iconType === 'Ionicons' ? (
-                          <Ionicons name={ext.icon as any} size={20} color="#000" />
-                        ) : ext.iconType === 'MaterialCommunityIcons' ? (
-                          <MaterialCommunityIcons name={ext.icon as any} size={20} color="#000" />
-                        ) : (
-                          <FontAwesome5 name={ext.icon as any} size={16} color="#000" />
-                        )}
-                      </View>
-                      <View className="flex-1">
-                        <View className="flex-row items-center">
-                          <Text className="text-base font-bold text-black">{ext.title}</Text>
-                          {ext.pro && (
-                            <View className="ml-2 bg-black px-1.5 py-0.5 rounded">
-                              <Text className="text-[10px] font-bold text-white">PRO</Text>
-                            </View>
+                  <View className="bg-[#121212] rounded-[32px] border border-gray-800 overflow-hidden">
+                    {filteredExtensions.map((ext, index) => (
+                      <TouchableOpacity 
+                        key={ext.id} 
+                        onPress={() => handleExtensionClick(ext)}
+                        className={`flex-row items-center p-5 ${index !== filteredExtensions.length - 1 ? 'border-b border-gray-800/60' : ''}`}
+                        activeOpacity={0.7}
+                      >
+                        <View className="w-12 h-12 bg-black rounded-xl items-center justify-center mr-4 border border-gray-800">
+                          {ext.iconType === 'Ionicons' ? (
+                            <Ionicons name={ext.icon as any} size={22} color="#ff006e" />
+                          ) : ext.iconType === 'MaterialCommunityIcons' ? (
+                            <MaterialCommunityIcons name={ext.icon as any} size={22} color="#ff006e" />
+                          ) : (
+                            <FontAwesome5 name={ext.icon as any} size={20} color="#ff006e" />
                           )}
                         </View>
-                        <Text className="text-gray-500 text-xs mt-0.5" numberOfLines={1}>{ext.description}</Text>
-                      </View>
-                      <Ionicons name="chevron-forward" size={20} color="#d1d5db" />
-                    </TouchableOpacity>
-                  ))
+                        <View className="flex-1 mr-4">
+                          <View className="flex-row items-center mb-1">
+                            <Text className="text-lg font-bold text-white mr-2">{ext.title}</Text>
+                            {ext.pro && (
+                              <View className="bg-pink-500/20 px-2 py-0.5 rounded-md border border-pink-500/30">
+                                <Text className="text-[10px] font-bold text-pink-400 tracking-wider">PRO</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text className="text-gray-400 text-xs leading-5" numberOfLines={2}>{ext.description}</Text>
+                        </View>
+                        <View className="w-8 h-8 rounded-full bg-gray-800 items-center justify-center">
+                          <Ionicons name="arrow-forward" size={16} color="#9ca3af" />
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                 )}
+            </View>
+
+            {/* Developer bottom row section */}
+            <View className="mt-8 mb-12 border-t border-gray-800/50 pt-8">
+              <View className="flex-row items-center justify-between mb-4 px-1">
+                <Text className="text-gray-400 font-bold uppercase tracking-widest text-xs">Community & Tools</Text>
+              </View>
+
+              <View className="flex-row space-x-3">
+                {/* Contribute Half */}
+                <TouchableOpacity 
+                  activeOpacity={0.8}
+                  className="flex-1 rounded-3xl border border-gray-800 bg-[#0a0a0a] overflow-hidden justify-between"
+                  style={{ minHeight: 140 }}
+                >
+                  <View className="p-4 flex-1">
+                    <View className="w-10 h-10 bg-white/10 rounded-full items-center justify-center mb-3">
+                      <Ionicons name="logo-github" size={20} color="white" />
+                    </View>
+                    <Text className="text-white font-bold leading-tight mb-1">Build Extensions</Text>
+                    <Text className="text-gray-500 text-[10px] leading-snug">
+                      Join our open-source repo.
+                    </Text>
+                  </View>
+                  <View className="py-2.5 px-4 bg-gray-900 flex-row items-center justify-between border-t border-gray-800">
+                    <Text className="text-pink-500 text-[10px] font-bold">GITHUB</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#ec4899" />
+                  </View>
+                </TouchableOpacity>
+
+                {/* Scanner Half */}
+                <TouchableOpacity 
+                  activeOpacity={0.8}
+                  onPress={() => setShowScanner(true)}
+                  className="flex-1 rounded-3xl border border-gray-800 ml-2 bg-[#121212] overflow-hidden justify-between"
+                  style={{ minHeight: 140 }}
+                >
+                  <View className="p-4 flex-1">
+                    <View className="w-10 h-10 bg-gray-800 rounded-full items-center justify-center mb-3">
+                      <Ionicons name="qr-code-outline" size={20} color="white" />
+                    </View>
+                    <Text className="text-white font-bold leading-tight mb-1">Local Dev</Text>
+                    <Text className="text-gray-500 text-[10px] leading-snug">
+                      Scan bundler QR code.
+                    </Text>
+                  </View>
+                  <View className="py-2.5 px-4 bg-black flex-row items-center justify-between border-t border-gray-800">
+                    <Text className="text-gray-300 text-[10px] font-bold">SCANNER</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#d1d5db" />
+                  </View>
+                </TouchableOpacity>
               </View>
             </View>
           </>
         )}
-        <View className="h-24" />
       </ScrollView>
     </RNSafeAreaView>
   );
