@@ -1,4 +1,5 @@
 import React from 'react';
+import { NativeModules } from 'react-native';
 import { ScreenBreakSDK, ScreenTimeStats } from './index';
 import * as ScreenTimeModule from '../../modules/screen-time';
 
@@ -19,8 +20,12 @@ const SDKProviderInstance: ScreenBreakSDK = {
   visuals: {
     setGrayscale: async (level: number) => {
       console.log(`[SDK] Setting Grayscale to: ${level}`);
-      // Here we would call the Native Module's Accessibility Service
-      // For now, we mock it.
+      // Send the request over the bridge to the Android Accessibility Service
+      if (NativeModules.ScreenBreak) {
+        NativeModules.ScreenBreak.setGrayscale(level);
+      } else {
+        console.warn(`[SDK] Native Module 'ScreenBreak' not available.`);
+      }
     },
     setBlueLightFilter: async (enabled: boolean) => {
       console.log(`[SDK] Blue Light Filter: ${enabled}`);
