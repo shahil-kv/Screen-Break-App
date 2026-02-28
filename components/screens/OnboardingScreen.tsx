@@ -13,6 +13,7 @@ import { ReclaimTimeStep } from './onboarding/ReclaimTimeStep';
 import { HowItHelpsStep } from './onboarding/HowItHelpsStep';
 import { PaywallStep } from './onboarding/PaywallStep';
 import { NotificationPermissionStep } from './onboarding/NotificationPermissionStep';
+import { JourneyBeginStep } from './onboarding/JourneyBeginStep';
 import { OnboardingHeader } from './onboarding/OnboardingHeader';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ScreenTimeModule from '../../modules/screen-time';
@@ -28,7 +29,7 @@ export const OnboardingScreen = () => {
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const prevStep = React.useRef(0);
 
-  const TOTAL_STEPS = 10; 
+  const TOTAL_STEPS = 11; 
 
   // Pre-fetch data earlier (Step 2) or auto-skip Step 3
   useEffect(() => {
@@ -121,12 +122,12 @@ export const OnboardingScreen = () => {
 
   const handleFinishOnboarding = async () => {
     await AsyncStorage.setItem('hasLaunched', 'true');
-    navigation.replace('Main');
+    navigation.replace('Main', { screen: 'Blocks' });
   };
 
   return (
     <SafeAreaView className="flex-1 bg-black">
-      {currentStep > 0 && (
+      {currentStep > 0 && currentStep < 10 && (
         <OnboardingHeader 
           currentStep={currentStep} 
           totalSteps={TOTAL_STEPS} 
@@ -189,6 +190,9 @@ export const OnboardingScreen = () => {
         )}
         {currentStep === 9 && (
           <NotificationPermissionStep onNext={handleNext} />
+        )}
+        {currentStep === 10 && (
+          <JourneyBeginStep onFinish={handleFinishOnboarding} />
         )}
       </View>
     </SafeAreaView>
