@@ -9,6 +9,7 @@ import { PermissionStep } from './onboarding/PermissionStep';
 import { ScreenTimeReportStep } from './onboarding/ScreenTimeReportStep';
 import { AppUsageStep } from './onboarding/AppUsageStep';
 import { ScreenTimeComparisonStep } from './onboarding/ScreenTimeComparisonStep';
+import { ReclaimTimeStep } from './onboarding/ReclaimTimeStep';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const OnboardingScreen = () => {
@@ -16,7 +17,7 @@ export const OnboardingScreen = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [screenTimeGoal, setScreenTimeGoal] = useState(4);
 
-  const TOTAL_STEPS = 7; 
+  const TOTAL_STEPS = 8; 
 
   const handleNext = () => {
     if (currentStep < TOTAL_STEPS - 1) {
@@ -56,6 +57,9 @@ export const OnboardingScreen = () => {
       )}
       {currentStep === 6 && (
         <ScreenTimeComparisonStep onNext={handleNext} />
+      )}
+      {currentStep === 7 && (
+        <ReclaimTimeStep onNext={handleNext} />
       )}
     </SafeAreaView>
   );
